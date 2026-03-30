@@ -29,7 +29,7 @@ let agendamentosFidelizados = [];
 
 const mensagensWhatsApp = {
   'Limpeza de Vidro': `Olá, {cliente}!\n\nPassando para confirmar o serviço de Limpeza de Vidro agendado para o dia {data}{hora}.\n\nNossos profissionais estarão prontos para deixar seus vidros impecáveis!\n\nMamute Cristalizações`,
-  'Cristalização de Piso': `Olá, {cliente}!\n\nConfirmando o agendamento para Cristalização de Piso em {data}{hora}.\n\nSeu piso ficará com acabamento profissional e durável!\n\nMamute Cristalizações`,
+  'Desencardimento de Piso': `Olá, {cliente}!\n\nConfirmando o agendamento para Desencardimento de Piso em {data}{hora}.\n\nSeu piso ficará limpo e brilhante!\n\nMamute Cristalizações`,
   'Polimento de Piso': `Olá, {cliente}!\n\nLembrando do agendamento de Polimento de Piso para {data}{hora}.\n\nVamos deixar seu piso brilhando!\n\nMamute Cristalizações`,
   'Limpeza de Fachada': `Olá, {cliente}!\n\nConfirmando a Limpeza de Fachada agendada para {data}{hora}.\n\nSua fachada ficará impecável!\n\nMamute Cristalizações`,
   'ACM': `Olá, {cliente}!\n\nConfirmando o serviço de Limpeza e Manutenção de ACM para {data}{hora}.\n\nSeu revestimento ficará como novo!\n\nMamute Cristalizações`,
@@ -633,6 +633,38 @@ function enviarWhatsApp(telefone, cliente, data, hora, categoria = 'Outros') {
 // Expõe funções globalmente (necessário para onclick inline)
 window.enviarWhatsApp = enviarWhatsApp;
 
+/**
+ * Envia detalhes de um agendamento para o grupo do WhatsApp dos funcionários.
+ * Abre o link wa.me com mensagem formatada para ser enviada ao grupo.
+ * @param {number} index - Índice do serviço no array global
+ */
+function enviarParaGrupoWhatsApp(index) {
+  const s = servicos[index];
+  if (!s) return;
+
+  const horaTexto = s.hora ? ` às ${s.hora}` : '';
+  const durTexto  = s.duracao > 1 ? `\nDuração: ${s.duracao} dia(s)` : '';
+  const telTexto  = s.telefone ? `\nContato: ${s.telefone}` : '';
+  const obsTexto  = s.obs ? `\nObs: ${s.obs}` : '';
+  const fidTexto  = s.fidelizado ? '\nCliente Fidelizado' : '';
+
+  const mensagem =
+    `*MAMUTE CRISTALIZAÇÕES — SERVIÇO AGENDADO*\n\n` +
+    `*Cliente:* ${s.empresa}\n` +
+    `*Data:* ${formatDateDisplay(s.data)}${horaTexto}\n` +
+    `*Serviço:* ${s.categoria}` +
+    durTexto +
+    telTexto +
+    fidTexto +
+    obsTexto +
+    `\n\n_Mamute Cristalizações — Sistema de Gestão_`;
+
+  const url = `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
+  window.open(url, '_blank');
+}
+
+window.enviarParaGrupoWhatsApp = enviarParaGrupoWhatsApp;
+
 // =====================================================
 // AGENDAMENTOS
 // =====================================================
@@ -706,11 +738,25 @@ function renderList() {
   if (!listaEl) return;
 
   const categoriaFiltro = filtroCategoria ? filtroCategoria.value : 'Todos';
-  const filtered = servicos.filter(s =>
-    categoriaFiltro === 'Todos' || s.categoria === categoriaFiltro
-  );
+  
+  // Filtra por status (concluídos ou pendentes) e depois por categoria
+  let filtered = servicos.filter(s => {
+    // Se o filtro é "Concluidos", mostra apenas concluídos
+    if (categoriaFiltro === 'Concluidos') {
+      return s.status === 'concluido';
+    }
+    // Caso contrário, mostra apenas pendentes
+    if (s.status === 'concluido') return false;
+    
+    // Filtra por categoria
+    if (categoriaFiltro === 'Todos') return true;
+    return s.categoria === categoriaFiltro;
+  });
 
   if (filtered.length === 0) {
+    const mensagem = categoriaFiltro === 'Concluidos' 
+      ? 'Nenhum agendamento concluído.'
+      : 'Nenhum agendamento pendente encontrado.';
     listaEl.innerHTML = `
       <div class="empty-state">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -719,7 +765,7 @@ function renderList() {
           <line x1="8" y1="2" x2="8" y2="6"/>
           <line x1="3" y1="10" x2="21" y2="10"/>
         </svg>
-        <p>Nenhum agendamento encontrado.</p>
+        <p>${mensagem}</p>
       </div>
     `;
     return;
@@ -806,6 +852,10 @@ function renderList() {
           Editar
         </button>
         ${whatsappBtn}
+        <button class="btn-action whatsapp" onclick="enviarParaGrupoWhatsApp(${index})" title="Enviar para o grupo dos funcionários">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          Grupo
+        </button>
         <button class="btn-action del" onclick="deleteServico(${index})">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
           Excluir
@@ -1337,6 +1387,10 @@ function renderizarOrcamentos() {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             Imprimir
           </button>
+          <button class="btn-action whatsapp" onclick="enviarOrcamentoWhatsApp(${idx})" title="Enviar orçamento via WhatsApp">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            WhatsApp
+          </button>
           <button class="btn-action del" onclick="excluirOrcamento(${idx})">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
             Excluir
@@ -1421,6 +1475,42 @@ window.imprimirOrcamento = function(idx) {
  * Exclui um orçamento pelo índice.
  * @param {number} idx
  */
+/**
+ * Envia o resumo de um orçamento via WhatsApp (link wa.me).
+ * @param {number} idx
+ */
+window.enviarOrcamentoWhatsApp = function(idx) {
+  const orc = orcamentos[idx];
+  if (!orc) return;
+
+  // Monta detalhes dos itens
+  const agrupados = {};
+  (orc.itens || []).forEach(m => {
+    if (!agrupados[m.tipo]) agrupados[m.tipo] = { area: 0, qtd: 0 };
+    if (m.tipo === 'Placa Solar') agrupados[m.tipo].qtd += m.quantidade;
+    else agrupados[m.tipo].area += m.area;
+  });
+
+  let itensTexto = '';
+  Object.keys(agrupados).forEach(tipo => {
+    const t = agrupados[tipo];
+    const valor = tipo === 'Placa Solar' ? `${t.qtd} unidade(s)` : `${t.area.toFixed(2)} m²`;
+    itensTexto += `\n- ${tipo}: ${valor}`;
+  });
+
+  const data = new Date(orc.created_at).toLocaleDateString('pt-BR');
+
+  const mensagem =
+    `*MAMUTE CRISTALIZAÇÕES — ORÇAMENTO*\n\n` +
+    `*Cliente:* ${orc.cliente}\n` +
+    `*Data:* ${data}\n` +
+    `*Itens medidos:*${itensTexto}\n\n` +
+    `_Mamute Cristalizações — Sistema de Gestão_`;
+
+  const url = `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
+  window.open(url, '_blank');
+};
+
 window.excluirOrcamento = async function(idx) {
   if (!confirm('Excluir este orçamento?')) return;
   const orc = orcamentos[idx];
@@ -1528,6 +1618,10 @@ function renderizarPromissorias() {
       </div>
       ${prom.descricao ? `<div class="card-obs">${escapeHtml(prom.descricao)}</div>` : ''}
       <div class="card-actions">
+        <button class="btn-action whatsapp" onclick="enviarPromissoriaWhatsApp(${idx})" title="Enviar alerta de vencimento via WhatsApp">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          WhatsApp
+        </button>
         <button class="btn-action del" onclick="excluirPromissoria(${idx})">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
           Excluir
@@ -1537,6 +1631,40 @@ function renderizarPromissorias() {
     listaPromissorias.appendChild(card);
   });
 }
+
+/**
+ * Envia alerta de vencimento de promissória via WhatsApp (link wa.me).
+ * @param {number} idx
+ */
+window.enviarPromissoriaWhatsApp = function(idx) {
+  const prom = promissorias[idx];
+  if (!prom) return;
+
+  const hoje = new Date();
+  const venc = new Date(prom.data_vencimento + 'T00:00:00');
+  const diff = Math.ceil((venc - hoje) / 86400000);
+
+  let statusTexto = '';
+  if (diff < 0) {
+    statusTexto = `ATRASADA há ${Math.abs(diff)} dia(s)`;
+  } else if (diff === 0) {
+    statusTexto = 'VENCE HOJE';
+  } else {
+    statusTexto = `Vence em ${diff} dia(s)`;
+  }
+
+  const mensagem =
+    `*MAMUTE CRISTALIZAÇÕES — ALERTA DE PROMISSÓRIA*\n\n` +
+    `*Cliente:* ${prom.cliente}\n` +
+    `*Valor:* ${formatCurrency(prom.valor)}\n` +
+    `*Vencimento:* ${formatDateDisplay(prom.data_vencimento)}\n` +
+    `*Status:* ${statusTexto}\n` +
+    (prom.descricao ? `*Descrição:* ${prom.descricao}\n` : '') +
+    `\n_Mamute Cristalizações — Sistema de Gestão_`;
+
+  const url = `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
+  window.open(url, '_blank');
+};
 
 window.excluirPromissoria = async function(idx) {
   if (!confirm('Excluir esta promissória?')) return;
@@ -1911,9 +2039,20 @@ if (formProduto) {
     };
 
     try {
-      const { error } = await supabaseClient.from('estoque').insert([novoProduto]);
-      if (error) throw error;
-      showToast('Produto salvo!', 'success');
+      if (window.editandoProdutoIdx !== undefined && window.editandoProdutoIdx !== -1) {
+        const prod = produtos[window.editandoProdutoIdx];
+        const { error } = await supabaseClient
+          .from('estoque')
+          .update(novoProduto)
+          .eq('id', prod.id);
+        if (error) throw error;
+        showToast('Produto atualizado!', 'success');
+        window.editandoProdutoIdx = -1;
+      } else {
+        const { error } = await supabaseClient.from('estoque').insert([novoProduto]);
+        if (error) throw error;
+        showToast('Produto salvo!', 'success');
+      }
       fecharModal('modalProduto');
       await carregarTodosDados();
       renderizarEstoque();
@@ -1922,6 +2061,8 @@ if (formProduto) {
     }
   });
 }
+
+window.editandoProdutoIdx = -1;
 
 /**
  * Renderiza a lista de produtos do estoque.
@@ -1973,6 +2114,18 @@ function renderizarEstoque() {
         </div>
       </div>
       <div class="card-actions">
+        <button class="btn-action success" onclick="atualizarQuantidadeProduto(${idx}, 1)" title="Adicionar 1 unidade">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          +1
+        </button>
+        <button class="btn-action warning" onclick="atualizarQuantidadeProduto(${idx}, -1)" title="Remover 1 unidade">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          -1
+        </button>
+        <button class="btn-action edit" onclick="abrirEdicaoProduto(${idx})">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Editar
+        </button>
         <button class="btn-action del" onclick="excluirProduto(${idx})">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
           Excluir
@@ -1982,6 +2135,56 @@ function renderizarEstoque() {
     listaEstoque.appendChild(card);
   });
 }
+
+/**
+ * Atualiza a quantidade de um produto rapidamente (+1 ou -1).
+ * @param {number} idx
+ * @param {number} delta - Quantidade a adicionar (positivo) ou remover (negativo)
+ */
+window.atualizarQuantidadeProduto = async function(idx, delta) {
+  const prod = produtos[idx];
+  if (!prod) return;
+
+  const novaQuantidade = Math.max(0, prod.quantidade + delta);
+
+  try {
+    const { error } = await supabaseClient
+      .from('estoque')
+      .update({ quantidade: novaQuantidade })
+      .eq('id', prod.id);
+
+    if (error) throw error;
+
+    const acao = delta > 0 ? 'adicionada' : 'removida';
+    showToast(`${Math.abs(delta)} unidade(s) ${acao}!`, 'success');
+    await carregarTodosDados();
+    renderizarEstoque();
+  } catch (error) {
+    showToast('Erro ao atualizar: ' + error.message, 'error');
+  }
+};
+
+/**
+ * Abre o modal de edição para um produto.
+ * @param {number} idx
+ */
+window.abrirEdicaoProduto = function(idx) {
+  const prod = produtos[idx];
+  if (!prod) return;
+
+  // Preenche os campos do modal com os dados do produto
+  document.getElementById('prodNome').value = prod.nome || '';
+  document.getElementById('prodCategoria').value = prod.categoria || '';
+  document.getElementById('prodQuantidade').value = prod.quantidade || 0;
+  document.getElementById('prodQuantidadeMinima').value = prod.quantidade_minima || 0;
+  document.getElementById('prodValor').value = prod.valor_unitario || 0;
+  document.getElementById('prodAlerta').checked = prod.alerta_ativo || false;
+
+  // Marca que estamos editando
+  window.editandoProdutoIdx = idx;
+
+  abrirModal('modalProduto');
+};
 
 window.excluirProduto = async function(idx) {
   if (!confirm('Excluir este produto?')) return;
@@ -2080,6 +2283,10 @@ function renderizarNotas() {
         </div>
       ` : ''}
       <div class="card-actions">
+        ${nota.tem_lembrete && nota.mensagem_whatsapp ? `<button class="btn-action whatsapp" onclick="enviarNotaWhatsApp(${idx})" title="Enviar mensagem via WhatsApp">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          WhatsApp
+        </button>` : ''}
         <button class="btn-action del" onclick="excluirNota(${idx})">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
           Excluir
@@ -2089,6 +2296,18 @@ function renderizarNotas() {
     listaNotas.appendChild(card);
   });
 }
+
+/**
+ * Envia a mensagem personalizada de uma nota via WhatsApp (link wa.me).
+ * @param {number} idx
+ */
+window.enviarNotaWhatsApp = function(idx) {
+  const nota = notas[idx];
+  if (!nota || !nota.mensagem_whatsapp) return;
+
+  const url = `https://wa.me/?text=${encodeURIComponent(nota.mensagem_whatsapp)}`;
+  window.open(url, '_blank');
+};
 
 window.excluirNota = async function(idx) {
   if (!confirm('Excluir esta nota?')) return;
