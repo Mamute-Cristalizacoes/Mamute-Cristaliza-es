@@ -1010,21 +1010,27 @@
      SCRIPTS
      ========================================== -->
 
-<!-- Supabase JS (CDN) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Supabase JS (CDN) - Carregamento prioritário -->
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <!-- ==========================================
      CONFIGURAÇÃO DO SUPABASE (COLOQUE SUAS CHAVES AQUI)
      Siga o GUIA_SUPABASE.md para obter estas chaves.
      ========================================== -->
 <script>
-  // Substitua os valores abaixo pelas suas chaves do Supabase
+  // Chaves do Supabase - Mamute Cristalizações
   const SUPABASE_URL      = 'https://fpgfbvrbvhkurwelxnjz.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwZ2ZidnJidmhrdXJ3ZWx4bmp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MzE0ODIsImV4cCI6MjA5MDQwNzQ4Mn0.C_fFTLN8W8KC5nGr4CGX8cv2eNp-dhy_a5HOopXkYtk';
+
+  // Log para depuração no console do navegador
+  console.log("Configurações do Supabase carregadas:", { 
+    urlConfigurada: SUPABASE_URL !== 'COLOQUE_SUA_URL_AQUI',
+    chaveConfigurada: SUPABASE_ANON_KEY !== 'COLOQUE_SUA_CHAVE_ANON_AQUI'
+  });
 </script>
 
 <!-- Aplicação Principal -->
-<script src="assets/js/app.js"></script>
+<script src="assets/js/app.js" defer></script>
 
 </body>
 </html>

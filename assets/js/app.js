@@ -28,14 +28,14 @@ let agendamentosFidelizados = [];
 // =====================================================
 
 const mensagensWhatsApp = {
-  'Limpeza de Vidro': `Olá, {cliente}! 👋\n\nPassando para confirmar o serviço de **Limpeza de Vidro** agendado para o dia *{data}*{hora}.\n\nNossos profissionais estarão prontos para deixar seus vidros impecáveis! ✨\n\nMamute Cristalizações 🐘`,
-  'Cristalização de Piso': `Olá, {cliente}! 👋\n\nConfirmando o agendamento para **Cristalização de Piso** em *{data}*{hora}.\n\nSeu piso ficará com acabamento profissional e durável! 💎\n\nMamute Cristalizações 🐘`,
-  'Polimento de Piso': `Olá, {cliente}! 👋\n\nLembrando do agendamento de **Polimento de Piso** para *{data}*{hora}.\n\nVamos deixar seu piso brilhando! ✨\n\nMamute Cristalizações 🐘`,
-  'Limpeza de Fachada': `Olá, {cliente}! 👋\n\nConfirmando a **Limpeza de Fachada** agendada para *{data}*{hora}.\n\nSua fachada ficará impecável! 🏢\n\nMamute Cristalizações 🐘`,
-  'ACM': `Olá, {cliente}! 👋\n\nConfirmando o serviço de **Limpeza e Manutenção de ACM** para *{data}*{hora}.\n\nSeu revestimento ficará como novo! 🔧\n\nMamute Cristalizações 🐘`,
-  'Esquadrias': `Olá, {cliente}! 👋\n\nConfirmando o agendamento para **Limpeza de Esquadrias** em *{data}*{hora}.\n\nSuas esquadrias ficarão limpas e brilhantes! 🪟\n\nMamute Cristalizações 🐘`,
-  'Limpeza de Placa Solar': `Olá, {cliente}! 👋\n\nConfirmando a **Limpeza de Placa Solar** agendada para *{data}*{hora}.\n\nSua eficiência energética será otimizada! ⚡\n\nMamute Cristalizações 🐘`,
-  'Outros': `Olá, {cliente}! 👋\n\nPassando para confirmar seu agendamento para *{data}*{hora}.\n\nEstamos prontos para atendê-lo! 🐘\n\nMamute Cristalizações 🐘`
+  'Limpeza de Vidro': `Olá, {cliente}!\n\nPassando para confirmar o serviço de Limpeza de Vidro agendado para o dia {data}{hora}.\n\nNossos profissionais estarão prontos para deixar seus vidros impecáveis!\n\nMamute Cristalizações`,
+  'Cristalização de Piso': `Olá, {cliente}!\n\nConfirmando o agendamento para Cristalização de Piso em {data}{hora}.\n\nSeu piso ficará com acabamento profissional e durável!\n\nMamute Cristalizações`,
+  'Polimento de Piso': `Olá, {cliente}!\n\nLembrando do agendamento de Polimento de Piso para {data}{hora}.\n\nVamos deixar seu piso brilhando!\n\nMamute Cristalizações`,
+  'Limpeza de Fachada': `Olá, {cliente}!\n\nConfirmando a Limpeza de Fachada agendada para {data}{hora}.\n\nSua fachada ficará impecável!\n\nMamute Cristalizações`,
+  'ACM': `Olá, {cliente}!\n\nConfirmando o serviço de Limpeza e Manutenção de ACM para {data}{hora}.\n\nSeu revestimento ficará como novo!\n\nMamute Cristalizações`,
+  'Esquadrias': `Olá, {cliente}!\n\nConfirmando o agendamento para Limpeza de Esquadrias em {data}{hora}.\n\nSuas esquadrias ficarão limpas e brilhantes!\n\nMamute Cristalizações`,
+  'Limpeza de Placa Solar': `Olá, {cliente}!\n\nConfirmando a Limpeza de Placa Solar agendada para {data}{hora}.\n\nSua eficiência energética será otimizada!\n\nMamute Cristalizações`,
+  'Outros': `Olá, {cliente}!\n\nPassando para confirmar seu agendamento para {data}{hora}.\n\nEstamos prontos para atendê-lo!\n\nMamute Cristalizações`
 };
 
 // Estado de edição
@@ -63,17 +63,54 @@ const AUTH_KEY       = 'mamute_auth_v1';
  */
 async function inicializarSupabase() {
   try {
-    if (typeof SUPABASE_URL === 'undefined' || typeof SUPABASE_ANON_KEY === 'undefined') {
-      console.error('❌ Chaves do Supabase não encontradas. Verifique o index.html.');
+    // 1. Espera o script do Supabase carregar (caso o CDN demore)
+    let tentativas = 0;
+    while (!window.supabase && tentativas < 20) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      tentativas++;
+    }
+
+    if (!window.supabase) {
+      throw new Error("O script do Supabase não pôde ser carregado. Verifique sua conexão com a internet ou se o link do CDN no index.html está correto.");
+    }
+
+    // 2. Verifica se as chaves estão definidas e não são placeholders
+    if (typeof SUPABASE_URL === 'undefined' || typeof SUPABASE_ANON_KEY === 'undefined' ||
+        SUPABASE_URL === 'COLOQUE_SUA_URL_AQUI' || SUPABASE_ANON_KEY === 'COLOQUE_SUA_CHAVE_ANON_AQUI' ||
+        !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      const mensagem = '⚠️ ATENÇÃO: Chaves do Supabase não configuradas!\n\nPor favor:\n1. Abra o arquivo index.html\n2. Procure por "COLOQUE_SUA_URL_AQUI" e "COLOQUE_SUA_CHAVE_ANON_AQUI"\n3. Substitua pelas suas chaves do Supabase\n4. Salve o arquivo\n5. Recarregue a página\n\nSiga o guia GUIA_SUPABASE.md para obter as chaves.';
+      console.error('❌', mensagem);
+      setTimeout(() => {
+        if (typeof showToast === 'function') showToast(mensagem, 'error');
+        else alert(mensagem);
+      }, 500);
       return false;
     }
 
+    // 3. Cria o cliente
     const { createClient } = window.supabase;
     supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log('✅ Supabase inicializado com sucesso!');
+    
+    // 4. Teste de conexão simples
+    const { error } = await supabaseClient.from('agendamentos').select('count', { count: 'exact', head: true });
+    if (error) {
+      if (error.code === 'PGRST301' || error.message.includes('JWT')) {
+        throw new Error("Sua chave 'anon' do Supabase parece estar incorreta ou expirada.");
+      } else if (error.message.includes('Failed to fetch')) {
+        throw new Error("Não foi possível conectar ao servidor do Supabase. Verifique a URL do projeto.");
+      }
+      throw error;
+    }
+
+    console.log('✅ Supabase conectado e funcionando!');
     return true;
   } catch (error) {
     console.error('❌ Erro ao inicializar Supabase:', error);
+    const mensagem = `❌ Erro de Conexão: ${error.message}`;
+    setTimeout(() => {
+      if (typeof showToast === 'function') showToast(mensagem, 'error');
+      else alert(mensagem);
+    }, 500);
     return false;
   }
 }
@@ -475,7 +512,9 @@ function showSaveNotification(msg = '✓ Salvo com sucesso!') {
  */
 async function carregarTodosDados() {
   if (!supabaseClient) {
-    console.warn('⚠️ Supabase não inicializado. Dados não carregados.');
+    const mensagem = '❌ Supabase não está configurado. Verifique se as chaves foram preenchidas no arquivo index.html';
+    console.warn(mensagem);
+    showToast(mensagem, 'error');
     return;
   }
 
@@ -1742,13 +1781,31 @@ if (formAgendFidelizado) {
     };
 
     try {
-      const { error } = await supabaseClient.from('agendamentos_fidelizados').insert([novoAgendamento]);
-      if (error) throw error;
-      showToast('Agendamento criado!', 'success');
+      // Salva na tabela de agendamentos fidelizados
+      const { error: errorFidel } = await supabaseClient.from('agendamentos_fidelizados').insert([novoAgendamento]);
+      if (errorFidel) throw errorFidel;
+
+      // Também salva na tabela geral de agendamentos para aparecer na aba principal
+      const agendamentoGeral = {
+        empresa: clienteSelecionado.nome,
+        data: novoAgendamento.data_agendamento,
+        hora: novoAgendamento.hora_agendamento,
+        telefone: clienteSelecionado.telefone || null,
+        duracao: 1,
+        categoria: novoAgendamento.categoria,
+        fidelizado: true,
+        obs: novoAgendamento.descricao
+      };
+
+      const { error: errorGeral } = await supabaseClient.from('agendamentos').insert([agendamentoGeral]);
+      if (errorGeral) throw errorGeral;
+
+      showToast('Agendamento criado com sucesso!', 'success');
       fecharModal('modalAgendFidelizado');
       clienteSelecionado = null;
       await carregarTodosDados();
       renderizarClientesFidelizados();
+      renderList();
     } catch (error) {
       showToast('Erro ao salvar: ' + error.message, 'error');
     }
