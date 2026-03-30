@@ -1304,25 +1304,30 @@ function renderizarOrcamentos() {
     }
 
     orcamentos.forEach((orc, idx) => {
-      const tipos = Array.isArray(orc.itens)
-        ? [...new Set(orc.itens.map(i => i.tipo))].join(', ')
-        : '—';
+      // Agrupa totais por tipo para o card
+      const totais = {};
+      (orc.itens || []).forEach(i => {
+        if (!totais[i.tipo]) totais[i.tipo] = { area: 0, qtd: 0 };
+        if (i.tipo === 'Placa Solar') totais[i.tipo].qtd += i.quantidade;
+        else totais[i.tipo].area += i.area;
+      });
+
+      const detalhesHtml = Object.keys(totais).map(tipo => {
+        const t = totais[tipo];
+        const valor = tipo === 'Placa Solar' ? `${t.qtd} un` : `${t.area.toFixed(2)} m²`;
+        return `<div class="card-info-item">
+          <span class="card-info-label">${tipo}</span>
+          <span class="card-info-value">${valor}</span>
+        </div>`;
+      }).join('');
 
       const card = document.createElement('div');
       card.className = 'card';
       card.innerHTML = `
         <div class="card-title">${escapeHtml(orc.cliente)}</div>
-        <span class="card-badge">${tipos}</span>
         <div class="card-info">
-          <div class="card-info-item">
-            <span class="card-info-label">Área Total</span>
-            <span class="card-info-value">${(orc.total_area || 0).toFixed(2)} m²</span>
-          </div>
-          <div class="card-info-item">
-            <span class="card-info-label">Placas</span>
-            <span class="card-info-value">${orc.total_placas || 0} un</span>
-          </div>
-          <div class="card-info-item">
+          ${detalhesHtml}
+          <div class="card-info-item" style="border-top: 1px dashed #444; margin-top: 8px; padding-top: 8px;">
             <span class="card-info-label">Data</span>
             <span class="card-info-value">${new Date(orc.created_at).toLocaleDateString('pt-BR')}</span>
           </div>
@@ -1354,12 +1359,27 @@ window.imprimirOrcamento = function(idx) {
   const orc = orcamentos[idx];
   if (!orc) return;
 
-  let itensHtml = '';
+  // Agrupa itens por tipo para a impressão
+  const agrupados = {};
   (orc.itens || []).forEach(m => {
-    const detalhes = m.tipo === 'Placa Solar'
-      ? `${m.quantidade} unidade(s)`
-      : `${m.largura.toFixed(2)}m × ${m.altura.toFixed(2)}m (${m.area.toFixed(2)} m²)`;
-    itensHtml += `<tr><td>${m.tipo}</td><td>${detalhes}</td></tr>`;
+    if (!agrupados[m.tipo]) agrupados[m.tipo] = { itens: [], totalArea: 0, totalQtd: 0 };
+    agrupados[m.tipo].itens.push(m);
+    if (m.tipo === 'Placa Solar') agrupados[m.tipo].totalQtd += m.quantidade;
+    else agrupados[m.tipo].totalArea += m.area;
+  });
+
+  let itensHtml = '';
+  Object.keys(agrupados).forEach(tipo => {
+    const grupo = agrupados[tipo];
+    itensHtml += `<tr style="background: #f4f4f4;"><td colspan="2"><strong>${tipo}</strong></td></tr>`;
+    grupo.itens.forEach(m => {
+      const detalhes = m.tipo === 'Placa Solar'
+        ? `${m.quantidade} unidade(s)`
+        : `${m.largura.toFixed(2)}m × ${m.altura.toFixed(2)}m (${m.area.toFixed(2)} m²)`;
+      itensHtml += `<tr><td style="padding-left: 20px;">Medição</td><td>${detalhes}</td></tr>`;
+    });
+    const resumo = tipo === 'Placa Solar' ? `${grupo.totalQtd} un` : `${grupo.totalArea.toFixed(2)} m²`;
+    itensHtml += `<tr style="border-bottom: 2px solid #333;"><td><strong>TOTAL ${tipo.toUpperCase()}</strong></td><td><strong>${resumo}</strong></td></tr>`;
   });
 
   const win = window.open('', '_blank');
