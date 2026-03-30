@@ -665,7 +665,8 @@ if (formServico) {
       duracao:   parseInt(duracaoInput.value) || 1,
       categoria: categoriaInput.value,
       fidelizado: fidelizadoInput.checked,
-      obs:       obsInput.value.trim() || null
+      obs:       obsInput.value.trim() || null,
+      status:    'pendente' // Novo campo: 'pendente' ou 'concluido'
     };
 
     try {
@@ -756,6 +757,12 @@ function renderList() {
     mesData.agendamentos.forEach((s, index) => {
     const card = document.createElement('div');
     card.className = `card${s.fidelizado ? ' fidelizado-card' : ''}`;
+    
+    // Estilo visual para agendamentos concluídos
+    if (s.status === 'concluido') {
+      card.style.opacity = '0.7';
+      card.style.borderLeft = '4px solid #10b981';
+    }
 
     const whatsappBtn = s.telefone
       ? `<button class="btn-action whatsapp" onclick="enviarWhatsApp('${s.telefone}', '${escapeHtml(s.empresa)}', '${formatDateDisplay(s.data)}', '${s.hora || ''}', '${s.categoria}')">
@@ -790,6 +797,10 @@ function renderList() {
       </div>
       ${s.obs ? `<div class="card-obs">${escapeHtml(s.obs)}</div>` : ''}
       <div class="card-actions">
+        ${s.status !== 'concluido' ? `<button class="btn-action success" onclick="marcarConcluido(${index})" title="Marcar como realizado">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Concluir
+        </button>` : `<span class="status-badge success" style="padding: 4px 8px; font-size: 12px;">✓ Concluído</span>`}
         <button class="btn-action edit" onclick="editServico(${index})">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           Editar
@@ -1198,20 +1209,41 @@ window.removerMedicao = function(idx) {
 };
 
 /**
- * Atualiza o display do total do orçamento.
+ * Atualiza o display do total do orçamento com separação por tipo de serviço.
  */
 function atualizarTotalOrcamento() {
   if (!totalOrcamentoDisplay) return;
 
-  let totalArea   = 0;
-  let totalPlacas = 0;
-
+  // Agrupa medições por tipo de serviço
+  const totaisPorTipo = {};
+  
   medicoesAtuais.forEach(m => {
-    if (m.tipo === 'Placa Solar') totalPlacas += m.quantidade;
-    else totalArea += m.area;
+    if (!totaisPorTipo[m.tipo]) {
+      totaisPorTipo[m.tipo] = { area: 0, quantidade: 0 };
+    }
+    
+    if (m.tipo === 'Placa Solar') {
+      totaisPorTipo[m.tipo].quantidade += m.quantidade;
+    } else {
+      totaisPorTipo[m.tipo].area += m.area;
+    }
   });
 
-  totalOrcamentoDisplay.textContent = `Total: ${totalArea.toFixed(2)} m²  |  ${totalPlacas} Placas`;
+  // Monta o texto de exibição com separação por tipo
+  let textoTotal = 'Total por Tipo: ';
+  const partes = [];
+  
+  Object.keys(totaisPorTipo).forEach(tipo => {
+    const totais = totaisPorTipo[tipo];
+    if (tipo === 'Placa Solar') {
+      partes.push(`${tipo}: ${totais.quantidade} un`);
+    } else {
+      partes.push(`${tipo}: ${totais.area.toFixed(2)} m²`);
+    }
+  });
+  
+  textoTotal += partes.join(' | ');
+  totalOrcamentoDisplay.textContent = textoTotal;
 }
 
 // Submit do formulário de orçamento
@@ -2098,3 +2130,24 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 console.log('✅ Mamute Cristalizações v2.0 — Sistema carregado com sucesso!');
+
+/**
+ * Marca um agendamento como concluído.
+ * @param {number} index
+ */
+window.marcarConcluido = async function(index) {
+  const servico = servicos[index];
+  try {
+    const { error } = await supabaseClient
+      .from('agendamentos')
+      .update({ status: 'concluido' })
+      .eq('id', servico.id);
+    
+    if (error) throw error;
+    showToast('Serviço marcado como concluído!', 'success');
+    await carregarTodosDados();
+    renderList();
+  } catch (error) {
+    showToast('Erro ao atualizar: ' + error.message, 'error');
+  }
+};
