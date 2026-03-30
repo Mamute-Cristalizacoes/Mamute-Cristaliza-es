@@ -1768,45 +1768,53 @@ if (formAgendFidelizado) {
       return;
     }
 
-    const novoAgendamento = {
-      cliente_fidelizado_id: clienteSelecionado.id,
-      data_agendamento:      document.getElementById('agendFidelData').value,
-      hora_agendamento:      document.getElementById('agendFidelHora').value,
-      categoria:             document.getElementById('agendFidelCategoria').value,
-      descricao:             document.getElementById('agendFidelDescricao').value.trim() || null,
-      status:                'agendado',
-      recorrente:            temRecorrencia,
-      dia_do_mes:            diaDoMes,
-      meses_ate:             mesesAte
+    // Criamos o objeto para a tabela PRINCIPAL de agendamentos
+    // Assim ele aparece na aba principal IMEDIATAMENTE
+    const agendamentoPrincipal = {
+      empresa:    clienteSelecionado.nome,
+      data:       document.getElementById('agendFidelData').value,
+      hora:       document.getElementById('agendFidelHora').value,
+      telefone:   clienteSelecionado.telefone || null,
+      duracao:    1,
+      categoria:  document.getElementById('agendFidelCategoria').value,
+      fidelizado: true, // Marca como fidelizado para ganhar a estrelinha no card
+      obs:        document.getElementById('agendFidelDescricao').value.trim() || null
     };
 
     try {
-      // Salva na tabela de agendamentos fidelizados
-      const { error: errorFidel } = await supabaseClient.from('agendamentos_fidelizados').insert([novoAgendamento]);
-      if (errorFidel) throw errorFidel;
+      // 1. Salva na tabela principal de agendamentos (para aparecer na aba Agendamentos)
+      const { error: errorGeral } = await supabaseClient.from('agendamentos').insert([agendamentoPrincipal]);
+      if (errorGeral) throw errorGeral;
 
-      // Também salva na tabela geral de agendamentos para aparecer na aba principal
-      const agendamentoGeral = {
-        empresa: clienteSelecionado.nome,
-        data: novoAgendamento.data_agendamento,
-        hora: novoAgendamento.hora_agendamento,
-        telefone: clienteSelecionado.telefone || null,
-        duracao: 1,
-        categoria: novoAgendamento.categoria,
-        fidelizado: true,
-        obs: novoAgendamento.descricao
+      // 2. Salva na tabela de fidelizados (para manter o histórico e contagem na aba Fidelizados)
+      const agendamentoFidel = {
+        cliente_fidelizado_id: clienteSelecionado.id,
+        data_agendamento:      agendamentoPrincipal.data,
+        hora_agendamento:      agendamentoPrincipal.hora,
+        categoria:             agendamentoPrincipal.categoria,
+        descricao:             agendamentoPrincipal.obs,
+        status:                'agendado',
+        recorrente:            temRecorrencia,
+        dia_do_mes:            diaDoMes,
+        meses_ate:             mesesAte
       };
 
-      const { error: errorGeral } = await supabaseClient.from('agendamentos').insert([agendamentoGeral]);
-      if (errorGeral) throw errorGeral;
+      const { error: errorFidel } = await supabaseClient.from('agendamentos_fidelizados').insert([agendamentoFidel]);
+      if (errorFidel) throw errorFidel;
 
       showToast('Agendamento criado com sucesso!', 'success');
       fecharModal('modalAgendFidelizado');
       clienteSelecionado = null;
+      
+      // Recarrega tudo para garantir que as listas atualizem
       await carregarTodosDados();
-      renderizarClientesFidelizados();
-      renderList();
+      
+      // Força a mudança para a aba de agendamentos para o usuário ver o resultado
+      const tabAgendamentos = document.querySelector('[data-tab="agendamentos"]');
+      if (tabAgendamentos) tabAgendamentos.click();
+      
     } catch (error) {
+      console.error('Erro ao salvar agendamento:', error);
       showToast('Erro ao salvar: ' + error.message, 'error');
     }
   });
